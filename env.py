@@ -6,7 +6,7 @@ with open('config.json', 'r') as f:
 APP_KEY = _config['APP_KEY']
 APP_SECRET = _config['APP_SECRET']
 CANO = _config["CANO"]
-ACCESS_TOKEN = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzUxMiJ9.eyJzdWIiOiJ0b2tlbiIsImF1ZCI6IjUxNGE3NmNiLWVhNmQtNGZiZi04MjhmLTA4Y2I5MmIzMDgzNSIsImlzcyI6InVub2d3IiwiZXhwIjoxNjcxNDQ2NjAyLCJpYXQiOjE2NzEzNjAyMDIsImp0aSI6IlBTU29UeXVaMngzelpUbmh4OXpGUTNvTlZaZUhORUpuYUdVaCJ9.-y9maV05NuZUIUunPVaGoY33bOMlTLjh6R01GCG_3GWAPIacVZ8r5oIzxrFcGyE-ba6vlMI2mqvuN4Cxf6BKGg"
+ACCESS_TOKEN = ""
 URL_BASE = "https://openapivts.koreainvestment.com:29443"
 
 # Auth
