@@ -20,6 +20,10 @@ env
     매수
     매도
 
+agent_env
+    매수, 매도, 관망
+    
+
 agent
     transformer + SAC모델
     시계열 데이터를 transformer에 넣어 ???
@@ -29,13 +33,21 @@ agent
     critic: 
         input: 현재가격, 행동, ???
         output: 행동의 평가 지표 -> 정규화하여 (0, 1) 일부분만 매매
+    
+    주식 가격 예측(종가)
+    예측된 종가가 현재가보다 낮을때
+        오늘 주식 흐름 예측하여 저점 예측 후 지정가 매수
+        다음날 종가 예측 후 다음날도 상승이면 매수 이후 관망
+    예측된 종가가 현재가보다 높을때
+        흐름 예측하여 고점 예측 후 지정가 매도
+    
 '''
 
-import env
+import stock_env
 # import agent
 
 SYMBOL = '005930'
 
 # env.auth()
-env.current_account()
-symbol_current_price = env.current_price(symbol=SYMBOL)
+stock_env.current_account()
+symbol_current_price = stock_env.current_price(symbol=SYMBOL)
