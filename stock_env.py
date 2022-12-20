@@ -7,7 +7,7 @@ with open('config.json', 'r') as f:
 APP_KEY = _config['APP_KEY']
 APP_SECRET = _config['APP_SECRET']
 CANO = _config["CANO"]
-ACCESS_TOKEN = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzUxMiJ9.eyJzdWIiOiJ0b2tlbiIsImF1ZCI6IjVlM2I5ODcxLTM1NDItNDMwYy1hZjAwLTU5NWMxYzJiMGFiYyIsImlzcyI6InVub2d3IiwiZXhwIjoxNjcxNTQzNDg5LCJpYXQiOjE2NzE0NTcwODksImp0aSI6IlBTU29UeXVaMngzelpUbmh4OXpGUTNvTlZaZUhORUpuYUdVaCJ9.0O3NEXmTwjEhS7Rj4NvCd9LgP7r9F7ZEWYJygRwWgy1v3R2Ufntc8xivfRQUUb8kCxwTgEU2nNcS6QLGqlg7Fw"
+ACCESS_TOKEN = ""
 URL_BASE = "https://openapivts.koreainvestment.com:29443"
 
 # Auth
@@ -66,6 +66,7 @@ def current_account():
                      수익률: {stock['evlu_pfls_rt']}, \
                      전일대비: {stock['bfdy_cprs_icdc']}, \
                      등락: {stock['fltt_rt']}")
+        # 오류시 complete 참고
 
     print(f"주식 평가 금액: {evaluation[0]['scts_evlu_amt']}원")
     print(f"평가 손익 합계: {evaluation[0]['evlu_pfls_smtl_amt']}원")
@@ -76,7 +77,7 @@ def current_account():
 def complete(start_time=None, end_time=None):
     '''
     FORMAT: 'YYYYMMDD'
-    DEFAULT -> todays
+    DEFAULT -> Today
     '''
 
     if not start_time:
@@ -112,7 +113,12 @@ def complete(start_time=None, end_time=None):
     stock_list = res.json()['output1']
     total_list = res.json()['output2']
 
-    # 출력값 정렬
+    for stock in stock_list:
+        # 매수    삼성전자    평균 매수가: 60000원, 체결수량: 10주, 총 체결금액: 600000원
+        print(f"{'매수' if stock['sll_buy_dvsn_cd'] == '01' else '매도'}\t{stock['prdt_name']}\t"\
+             +f"주문단가: {stock['ord_unpr']}, 주문수량: {stock['ord_qty']}, 총 체결금액: {stock['tot_ccld_amt']}")
+
+    print(f"총 주문수량: {total_list['tot_ord_qty']}, 총 체결수량: {total_list['tot_ccld_qty']}, 총 체결금액:{total_list['tot_ccld_amt']}")
 
     return res.json()
 
@@ -179,4 +185,3 @@ def sell(symbol, price, counts):
     res = requests.post(URL, headers=headers, params=params)
     print(res.json()['msg1'])
     return res.json()
-
