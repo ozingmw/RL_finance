@@ -13,12 +13,13 @@ main
         이전 데이터에 오늘 데이터 추가
         새로운 데이터로 재 학습
 
-env
-    인증
-    현재 잔고 확인
-    현재 가격 확인
-    매수
-    매도
+# stock_env
+#     인증
+#     현재 잔고 확인
+#     현재 가격 확인
+#     매수
+#     매도
+#     오늘 거래내역 확인
 
 agent_env
     매수, 매도, 관망
@@ -43,8 +44,12 @@ agent
     
 '''
 
+import time_check
 import stock_env
 # import agent
+
+time_check.check()
+
 
 SYMBOL = '005930'
 
