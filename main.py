@@ -2,6 +2,7 @@
 main
     # 현재 시간 확인
     # 9시 이전이면 9시 까지 대기
+    # 15시 이후라면 오늘 데이터 추가 및 모델 추가 학습
 
     장 시작 후
         현재 가격 확인
@@ -47,7 +48,7 @@ agent
 import time_check
 import stock_env
 
-time_check.check()
+# time_check.check()
 
 
 SYMBOL = '005930'
