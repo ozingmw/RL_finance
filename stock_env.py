@@ -12,15 +12,15 @@ URL_BASE = "https://openapivts.koreainvestment.com:29443"
 
 # Auth
 def auth():
+    PATH = "oauth2/tokenP"
+    URL = f"{URL_BASE}/{PATH}"
     headers = {"content-type":"application/json"}
-    body = {
+    params = {
         "grant_type":"client_credentials",
         "appkey":APP_KEY, 
         "appsecret":APP_SECRET
     }
-    PATH = "oauth2/tokenP"
-    URL = f"{URL_BASE}/{PATH}"
-    res = requests.post(URL, headers=headers, data=json.dumps(body))
+    res = requests.post(URL, headers=headers, data=json.dumps(params))
     
     global ACCESS_TOKEN
     ACCESS_TOKEN = res.json()["access_token"]
@@ -60,12 +60,11 @@ def current_account():
     for stock in stock_list:
         if int(stock['hldg_qty']) > 0:
             stock_dict[stock['pdno']] = stock['hldg_qty']
-            print(f"{stock['prdt_name']}({stock['pdno']}): {stock['hldg_qty']}주, \
-                     매입단가: {stock['pchs_avg_pric']}원, \
-                     현재가: {stock['prpr']}, \
-                     수익률: {stock['evlu_pfls_rt']}, \
-                     전일대비: {stock['bfdy_cprs_icdc']}, \
-                     등락: {stock['fltt_rt']}")
+            print(f"{stock['prdt_name']}({stock['pdno']}): {stock['hldg_qty']}주 | "
+                 +f"현재가: {stock['prpr']}원 | "
+                 +f"등락: {float(stock['fltt_rt']):.2f}% | "
+                 +f"매입단가: {stock['pchs_avg_pric']}원 | "
+                 +f"수익률: {stock['evlu_pfls_rt']}% | ")
         # 오류시 complete 참고
 
     print(f"주식 평가 금액: {evaluation[0]['scts_evlu_amt']}원")
@@ -87,7 +86,7 @@ def complete(start_time=None, end_time=None):
     URL = f"{URL_BASE}/{PATH}"
     headers = {
         "Content-Type":"application/json", 
-        "authorization": ACCESS_TOKEN,
+        "authorization": f"Bearer {ACCESS_TOKEN}",
         "appKey":APP_KEY,
         "appSecret":APP_SECRET,
         "tr_id":"VTTC8001R"
@@ -115,10 +114,10 @@ def complete(start_time=None, end_time=None):
 
     for stock in stock_list:
         # 매수    삼성전자    평균 매수가: 60000원, 체결수량: 10주, 총 체결금액: 600000원
-        print(f"{'매수' if stock['sll_buy_dvsn_cd'] == '01' else '매도'}\t{stock['prdt_name']}\t"\
-             +f"주문단가: {stock['ord_unpr']}, 주문수량: {stock['ord_qty']}, 총 체결금액: {stock['tot_ccld_amt']}")
+        print(f"{'매도' if stock['sll_buy_dvsn_cd'] == '01' else '매수'} | {stock['prdt_name']} | "\
+             +f"주문단가: {stock['ord_unpr']} | 주문수량: {stock['ord_qty']} | 총 체결금액: {stock['tot_ccld_amt']}")
 
-    print(f"총 주문수량: {total_list['tot_ord_qty']}, 총 체결수량: {total_list['tot_ccld_qty']}, 총 체결금액:{total_list['tot_ccld_amt']}")
+    print(f"총 주문수량: {total_list['tot_ord_qty']} | 총 체결수량: {total_list['tot_ccld_qty']} | 총 체결금액:{total_list['tot_ccld_amt']}")
 
     return res.json()
 
@@ -158,11 +157,11 @@ def buy(symbol, price, counts):
         'CANO': str(CANO),
         'ACNT_PRDT_CD': "00",
         'PDNO': str(symbol), 
-        'ORD_DVSN': "01", 
+        'ORD_DVSN': "00", 
         'ORD_QTY': str(counts),
         'ORD_UNPR': str(price)
     }
-    res = requests.post(URL, headers=headers, params=params)
+    res = requests.post(URL, headers=headers, data=json.dumps(params))
     print(res.json()['msg1'])
     return res.json()
 
@@ -182,6 +181,6 @@ def sell(symbol, price, counts):
         'ORD_QTY': str(counts),
         'ORD_UNPR': str(price)
     }
-    res = requests.post(URL, headers=headers, params=params)
+    res = requests.post(URL, headers=headers, data=json.dumps(params))
     print(res.json()['msg1'])
     return res.json()

@@ -46,13 +46,16 @@ agent
 
 import time_check
 import stock_env
-# import agent
 
 time_check.check()
 
 
 SYMBOL = '005930'
 
-# env.auth()
+stock_env.auth()
 stock_env.current_account()
-symbol_current_price = stock_env.current_price(symbol=SYMBOL)
+stock_env.current_price(symbol=SYMBOL)
+
+stock_env.buy(SYMBOL, 58300, 1)
+
+stock_env.complete()
