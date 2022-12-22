@@ -47,11 +47,19 @@ agent
 
 import time_check
 import stock_env
-
-# time_check.check()
-
+import data_collecter
 
 SYMBOL = '005930'
+
+sys_time = time_check.check().lower()
+if sys_time != "d":
+    if sys_time == "w":
+        print("주말")
+        # agent.train()
+    else:
+        print("장 마감")
+        data_collecter.update_csv(SYMBOL)
+print("장 중")
 
 stock_env.auth()
 stock_env.current_account()
