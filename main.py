@@ -45,26 +45,25 @@ agent
     
 '''
 
+import sys
+
 import time_check
 import stock_env
 import data_collecter
+import agent
 
 SYMBOL = '005930'
+model = agent.LSTM_Agent()
 
-sys_time = time_check.check().lower()
-if sys_time != "d":
-    if sys_time == "w":
-        print("주말")
-        # agent.train()
-    else:
-        print("장 마감")
-        data_collecter.update_csv(SYMBOL)
+sys_time = time_check.check()
+if sys_time == "w":
+    # agent.train()
+    sys.exit("주말")
+elif sys_time == "a":
+    data_collecter.update_all_csv()
+    sys.exit("장 마감")
 print("장 중")
 
 stock_env.auth()
 stock_env.current_account()
-stock_env.current_price(symbol=SYMBOL)
 
-stock_env.buy(SYMBOL, 58300, 1)
-
-stock_env.complete()
