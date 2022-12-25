@@ -27,8 +27,8 @@ agent_env
     
 
 agent
-    transformer + SAC모델
-    시계열 데이터를 transformer에 넣어 ???
+    GRU + SAC모델
+    시계열 데이터를 GRU에 넣어 ???
     actor:
         input: 이전가격, 현재가격, ???
         output: 1.매수, 2.매도, 3.관망
@@ -53,17 +53,38 @@ import data_collecter
 import agent
 
 SYMBOL = '005930'
-model = agent.LSTM_Agent()
+model = agent.OO_agent()
 
 sys_time = time_check.check()
-if sys_time == "w":
-    # agent.train()
-    sys.exit("주말")
+if sys_time == "w1":
+    print("주말(토요일)")
+    model.train()
+    sys.exit("학습 종료")
+elif sys_time == "w2":
+    sys.exit("주말(일요일)")
 elif sys_time == "a":
+    print("장 마감")
     data_collecter.update_all_csv()
-    sys.exit("장 마감")
+    sys.exit("데이터 업데이트 완료")
 print("장 중")
 
 stock_env.auth()
 stock_env.current_account()
 
+symbol_price = stock_env.current_price(SYMBOL)
+
+
+action = model.predict(symbol_price)
+
+'''
+단타?
+매 초/분 마다 데이터 불러와서
+분당 데이터로 학습한 모델에 넣기
+-> 오늘 가격중 가장 낮을거같은 가격에 구매
+-> 구매 이후 높을거같은 가격에 판매
+
+매 분 마다 데이터 불러와서
+일별 데이터로 학습한 모델에 넣기
+시장가로 평가된 비율에 따라 전체 잔고중 얼마만큼만 구매
+학습한 모델이 판매를 선택하면 전부 판매
+'''
