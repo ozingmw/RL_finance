@@ -10,7 +10,7 @@ def naver_min_crawler(symbol, day) -> pd.DataFrame:
     page = 1
     df = pd.DataFrame(columns=["Time", "Price", "Diff_price", "Sell_price", "Buy_price", "Volume", "Change"])
 
-    for page in tqdm(range(1, 41), desc=f'{symbol}: day'):
+    for page in tqdm(range(1, 41), desc=f'{symbol}_min'):
         URL = f"https://finance.naver.com/item/sise_time.naver?code={symbol}&thistime={day}160000&page={page}"
         headers = {'User-agent': 'Mozilla/5.0'}
         res = requests.get(url=URL, headers=headers)
@@ -46,6 +46,9 @@ def naver_min_crawler(symbol, day) -> pd.DataFrame:
     return reversed_df
 
 def naver_day_crawler(symbol, start_day, end_day):
+    if not start_day:
+        start_day = end_day = datetime.date.today().strftime("%Y%m%d")
+
     URL = f"https://fchart.stock.naver.com/sise.nhn?symbol={symbol}&timeframe=day&count=10000&requestType=0"
     headers = {'User-agent': 'Mozilla/5.0'}
     res = requests.get(url=URL, headers=headers)
@@ -54,7 +57,7 @@ def naver_day_crawler(symbol, start_day, end_day):
     df = pd.DataFrame(columns=['Time', 'Open', 'High', 'Low', 'Close', 'Volume'])
 
     line_list = xml.find_all('item')
-    for line in tqdm(line_list, desc=f'{symbol}: '):
+    for line in tqdm(line_list, desc=f'{symbol}_day'):
         data_list = line.attrs['data'].split("|")
         if int(start_day) > int(data_list[0]):
             continue
@@ -112,8 +115,12 @@ def update_csv(symbol, start_day=None, end_day=None):
     '''
     _make_update_csv('update', symbol, start_day, end_day)
 
-def update_all_csv(path='./data/min'):
-    data_list = os.listdir(path)
+def update_all_csv():
+    data_list = os.listdir('./data/min')
     for data in data_list:
         symbol = data.split(".")
         update_csv(symbol[0])
+    data_list = os.listdir('./data/day')
+    for data in data_list:
+        symbol = data.split(".")
+        naver_day_crawler(symbol[0])

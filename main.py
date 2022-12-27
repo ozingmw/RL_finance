@@ -14,6 +14,10 @@ main
         이전 데이터에 오늘 데이터 추가
         새로운 데이터로 재 학습
 
+    매 프로그램마다 각자 SYMBOL에 맞는 것만 판단
+    따라서 여러 프로그램이 실행되어야함
+    -> 이 때 학습을 진행하면 여러 프로그램 학습 안되는거 아녀?
+
 stock_env
     # 인증
     # 현재 잔고 확인
@@ -22,12 +26,12 @@ stock_env
     # 매도
     # 오늘 거래내역 확인
 
-agent_env
+data_env
     매수, 매도, 관망
     
 
 agent
-    GRU + SAC모델
+    GRU + A2C모델
     시계열 데이터를 GRU에 넣어 ???
     actor:
         input: 이전가격, 현재가격, ???
@@ -53,7 +57,10 @@ import data_collecter
 import agent
 
 SYMBOL = '005930'
-model = agent.OO_agent()
+model = agent.OO_agent(symbol=SYMBOL)
+
+stock_env.auth()
+stock_env.current_account()
 
 sys_time = time_check.check()
 if sys_time == "w1":
@@ -68,13 +75,29 @@ elif sys_time == "a":
     sys.exit("데이터 업데이트 완료")
 print("장 중")
 
-stock_env.auth()
-stock_env.current_account()
+while time_check.check() == 'd':
 
-symbol_price = stock_env.current_price(SYMBOL)
+    symbol_price = stock_env.current_price(SYMBOL)
+    action, value = model.predict(symbol_price)
 
+    stock_list = stock_env.current_account()['output1']
+    evaluation = stock_env.current_account()['output2'][0]
 
-action = model.predict(symbol_price)
+    if action == 0:
+        total_balance = int(evaluation['tot_evlu_amt'])
+        available_price = total_balance * value
+        available_price = min(evaluation['dnca_tot_amt'], available_price)
+        available_counts = int(available_price / symbol_price)
+        stock_env.buy(SYMBOL, symbol_price, available_counts)
+    elif action == 1:
+        for stock in stock_list:
+            if stock['pdno'] == SYMBOL:
+                break
+        counts = stock['hldg_qty']
+        stock_env.current_account()['output']
+        stock_env.sell(SYMBOL, symbol_price, counts)
+    elif action == 2:
+        pass
 
 '''
 단타?

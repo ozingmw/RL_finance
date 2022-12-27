@@ -62,7 +62,7 @@ def current_account():
             stock_dict[stock['pdno']] = stock['hldg_qty']
             print(f"{stock['prdt_name']}({stock['pdno']}): {stock['hldg_qty']}주 | "
                  +f"현재가: {stock['prpr']}원 | "
-                 +f"등락: {float(stock['fltt_rt']):.2f}% | "
+                 +f"오늘 등락: {float(stock['fltt_rt']):.2f}% | "
                  +f"매입단가: {stock['pchs_avg_pric']}원 | "
                  +f"수익률: {stock['evlu_pfls_rt']}% | ")
         # 오류시 complete 참고

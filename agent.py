@@ -2,6 +2,8 @@ import tensorflow as tf
 from keras.models import Model
 from keras.layers import GRU, BatchNormalization, Dense, Concatenate
 
+from data_env import data_env
+
 class Actor(Model):
     def __init__(self):
         super(Actor, self).__init__()
@@ -49,19 +51,32 @@ class Critic(Model):
 
 
 class OO_agent:
-    def __init__(self):
+    def __init__(self, symbol):
         self.actor = Actor()
         self.critic = Critic()
+        self.env = data_env('./data/day', symbol)
 
     def load_model(self, path):
-        pass
+        self.actor.load_weights(path)
+        self.critic.load_weights(path)
 
     def save_model(self, symbol):
         self.actor.save_weights(f"./model/{symbol}_actor.h5")
         self.critic.save_weights(f"./model/{symbol}_critic.h5")
 
-    def train():
-        pass
+    def train(self):
+        max_episode = 1000
+        
+        for episode in range(max_episode):
+            self.env._reset()
+            action, value, total_reward, done = 2, 0, 0, False
+
+            while not done:
+                next_state, reward, done, info = self.env.step(action, value)
+                total_reward += reward
+                
+                if done:
+                    break
 
     def predict():
         pass
