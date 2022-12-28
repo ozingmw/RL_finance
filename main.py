@@ -54,10 +54,14 @@ import sys
 import time_check
 import stock_env
 import data_collecter
+from data_env import data_env
 import agent
 
 SYMBOL = '005930'
-model = agent.OO_agent(symbol=SYMBOL)
+env = data_env('./data/day', SYMBOL, render_mode=False)
+model = agent.OO_agent(symbol=SYMBOL, env=env)
+
+model.load_model()
 
 stock_env.auth()
 stock_env.current_account()
@@ -98,6 +102,11 @@ while time_check.check() == 'd':
         stock_env.sell(SYMBOL, symbol_price, counts)
     elif action == 2:
         pass
+
+
+print("장 마감")
+data_collecter.update_all_csv()
+sys.exit("데이터 업데이트 완료")
 
 '''
 단타?

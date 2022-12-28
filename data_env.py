@@ -1,13 +1,14 @@
 import pandas as pd
+import matplotlib.pyplot as plt
 
 class data_env:
-    def __init__(self, path, symbol):
+    def __init__(self, path, symbol, render_mode=True):
         self.path = path
         self.symbol = symbol
         self.df = pd.read_csv(f'{path}/{symbol}.csv')
         self.state_pointer = 0
         self.state = self.df.iloc[self.state_pointer]
-        self.colums = self.df.columns
+        self.columns = self.df.columns
         self.done = False
 
         self.balance = 100000000
@@ -20,11 +21,14 @@ class data_env:
         self.buy_average = 0
         self.buy_counts = 0
 
+        self.time_list = []
+        self.render_mode = render_mode
+
     def _reset(self):
         self.__init__(self.path, self.symbol)
         return self._get_state()
 
-    def step(self, action, counts):
+    def step(self, action, counts=0):
         '''
             ### action
                 0: buy
@@ -60,6 +64,10 @@ class data_env:
                 self.cash_balance -= int(trading_cost) * self.tax3
             self.cash_balance -= trading_cost
             self.stock_balance += trading_cost
+
+            # 시각화를 위한 저장
+            self.time_list.append([0, self.state['Time'], self.state['Close']])
+
         elif action == 1:
             counts = min(self.buy_counts, counts)
             trading_cost = self.state['Close'] * counts
@@ -78,9 +86,14 @@ class data_env:
             if self.buy_counts == 0:
                 self.buy_average = 0
 
+            # 시각화를 위한 저장
+            self.time_list.append([1, self.state['Time'], self.state['Close']])
+
         self.stock_balance = self.state['Close'] * self.buy_counts
         self.balance = self.cash_balance + self.stock_balance
         reward = self.balance - self.before_balance
+
+        self.render()
 
         self.state_pointer += 1
         if self.state_pointer >= len(self.df):
@@ -95,3 +108,29 @@ class data_env:
     
     def _get_info(self):
         return {'balance': self.balance, 'stock_balance': self.stock_balance, 'cash_balance': self.cash_balance, 'buy_average': self.buy_average}
+
+    def _change_render(self):
+        if self.render_mode:
+            self.render_mode = False
+        else:
+            self.render_mode = True
+
+    def render(self):
+        if not self.render_mode:
+            return
+
+        plt.figure(figsize=(12,6))
+        train_data = self.df.iloc[:self.state_pointer+1]
+        x1 = [str(x) for x in train_data['Time']]
+        plt.plot(x1, train_data['Close'].values)
+        for time in self.time_list:
+            plt.annotate(f'{"BUY" if time[0] == 0 else "SELL"}', xy=(str(time[1]), time[2]), xytext=(str(time[1]), time[2]+300),
+                         fontsize=14, arrowprops=dict(facecolor='black', width=1, shrink=0.1, headwidth=10))
+            if time[0]:
+                plt.scatter(str(time[1]), time[2], c='r')
+            else:
+                plt.scatter(str(time[1]), time[2], c='b')
+        plt.xticks(rotation=15)
+        plt.show()
+
+data_env('./data/day', '005930', False)

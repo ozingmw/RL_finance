@@ -46,7 +46,7 @@ def naver_min_crawler(symbol, day) -> pd.DataFrame:
     return reversed_df
 
 def naver_day_crawler(symbol, start_day, end_day):
-    if not start_day:
+    if not end_day:
         start_day = end_day = datetime.date.today().strftime("%Y%m%d")
 
     URL = f"https://fchart.stock.naver.com/sise.nhn?symbol={symbol}&timeframe=day&count=10000&requestType=0"
@@ -74,9 +74,9 @@ def naver_day_crawler(symbol, start_day, end_day):
         if int(end_day) <= int(data_list[0]):
             break
 
-    if f'{symbol}.csv' in os.listdir('./data/day'):
-        df_all = pd.read_csv(f'./data/day/{symbol}.csv')
-        df = pd.concat([df_all, df])
+    # if f'{symbol}.csv' in os.listdir('./data/day'):
+    #     df_all = pd.read_csv(f'./data/day/{symbol}.csv')
+    #     df = pd.concat([df_all, df])
     
     df.to_csv(f"./data/day/{symbol}.csv", index=False)
     
@@ -120,7 +120,7 @@ def update_all_csv():
     for data in data_list:
         symbol = data.split(".")
         update_csv(symbol[0])
-    data_list = os.listdir('./data/day')
-    for data in data_list:
-        symbol = data.split(".")
-        naver_day_crawler(symbol[0])
+    # data_list = os.listdir('./data/day')
+    # for data in data_list:
+    #     symbol = data.split(".")
+    #     naver_day_crawler(symbol[0])

@@ -1,11 +1,11 @@
-import tensorflow as tf
+from collections import deque
+import numpy as np
 from keras.models import Model
-from keras.layers import GRU, BatchNormalization, Dense, Concatenate
-
-from data_env import data_env
+from keras.layers import GRU, BatchNormalization, Dense, Concatenate, Input
+from keras.optimizers import Adam
 
 class Actor(Model):
-    def __init__(self):
+    def __init__(self, action_dim):
         super(Actor, self).__init__()
         
         self.L1 = GRU(256, dropout=0.1, return_sequences=True, kernel_initializer='he_normal') 
@@ -14,7 +14,7 @@ class Actor(Model):
         self.B2 = BatchNormalization()
         self.L3 = GRU(64, dropout=0.1, return_sequences=True, kernel_initializer='he_normal')
         self.B3 = BatchNormalization()
-        self.D = Dense(1)
+        self.D = Dense(action_dim, activation='sigmoid')
 
     def call(self, state):
         x = self.L1(state)
@@ -23,8 +23,6 @@ class Actor(Model):
         x = self.B2(x)
         x = self.L3(x)
         x = self.B3(x)
-        x = self.L4(x)
-        x = self.B4(x)
         x = self.D(x)
 
         return x
@@ -51,18 +49,42 @@ class Critic(Model):
 
 
 class OO_agent:
-    def __init__(self, symbol):
-        self.actor = Actor()
+    def __init__(self, symbol, env):
+        self.symbol = symbol
+        self.env = env
+        self.action_dim = 3     #[0, 1, 2] -> ['매수', '매도', '관망']
+        self.env_state = self.env.df[:self.env.state_pointer+1]
+        self.actor_input_shape = (None, len(self.env.columns)-1, len(self.env_state))
+        self.ACTOR_LEARNING_RATE = 0.0001
+        self.CRITIC_LEARNING_RATE = 0.001
+
+        self.actor = Actor(action_dim=self.action_dim)
+        self.target_actor = Actor(action_dim=self.action_dim)
         self.critic = Critic()
-        self.env = data_env('./data/day', symbol)
+        self.target_critic = Critic()
+        self.actor.build(input_shape=self.actor_input_shape)
+        self.target_actor.build(input_shape=self.actor_input_shape)
+        state_in = Input((len(self.env.columns)-1), )
+        action_in = Input((self.action_dim, ))
+        self.critic([state_in, action_in])
+        self.target_critic([state_in, action_in])
+        
+        self.actor_optimizer = Adam(learning_rate=self.ACTOR_LEARNING_RATE)
+        self.critic_optimizer = Adam(learning_rate=self.CRITIC_LEARNING_RATE)
 
-    def load_model(self, path):
-        self.actor.load_weights(path)
-        self.critic.load_weights(path)
+        self.save_episode_reward = []
 
-    def save_model(self, symbol):
-        self.actor.save_weights(f"./model/{symbol}_actor.h5")
-        self.critic.save_weights(f"./model/{symbol}_critic.h5")
+    def get_action(self, action_output):
+        action = np.argmax(action_output)
+        return action
+
+    def load_model(self):
+        self.actor.load_weights(f'./model/{self.symbol}_actor.h5')
+        self.critic.load_weights(f'./model/{self.symbol}_critic.h5')
+
+    def save_model(self):
+        self.actor.save_weights(f"./model/{self.symbol}_actor.h5")
+        self.critic.save_weights(f"./model/{self.symbol}_critic.h5")
 
     def train(self):
         max_episode = 1000
@@ -70,6 +92,7 @@ class OO_agent:
         for episode in range(max_episode):
             self.env._reset()
             action, value, total_reward, done = 2, 0, 0, False
+            batch_memory = deque(maxlen=self.batch_size)
 
             while not done:
                 next_state, reward, done, info = self.env.step(action, value)
@@ -80,3 +103,8 @@ class OO_agent:
 
     def predict():
         pass
+
+from data_env import data_env
+symbol = '005930'
+env = data_env('./data/day', symbol, False)
+agent = OO_agent(symbol, env)
