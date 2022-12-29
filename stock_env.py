@@ -2,6 +2,10 @@ import requests
 import json
 import datetime
 
+'''
+    해외 잔고도 확인 가능해야함
+'''
+
 with open('config.json', 'r') as f:
     _config = json.load(f)
 APP_KEY = _config['APP_KEY']

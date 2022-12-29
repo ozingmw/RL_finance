@@ -1,15 +1,19 @@
 import pandas as pd
 import matplotlib.pyplot as plt
+import random
 
 class data_env:
-    def __init__(self, path, symbol, render_mode=True):
+    def __init__(self, path, symbol, max_episodes=250, render_mode=False):
         self.path = path
         self.symbol = symbol
+        self.render_mode = render_mode
+        self.episodes = 1
+        self.max_episodes = max_episodes
+
         self.df = pd.read_csv(f'{path}/{symbol}.csv')
-        self.state_pointer = 0
+        self.state_pointer = random.randint(0, len(self.df)-(self.max_episodes+1))
         self.state = self.df.iloc[self.state_pointer]
         self.columns = self.df.columns
-        self.done = False
 
         self.balance = 100000000
         self.cash_balance = self.balance
@@ -22,7 +26,7 @@ class data_env:
         self.buy_counts = 0
 
         self.time_list = []
-        self.render_mode = render_mode
+        self.done = False
 
     def _reset(self):
         self.__init__(self.path, self.symbol)
@@ -40,13 +44,20 @@ class data_env:
                     Time, Open, High, Low, Close, Volume
                 min
                     Time, Price, Diff_price, Sell_price, Buy_price, Volume, Change
+
+            ### reward
+                before_balance - after_balance
         '''
+
         if self.done:
             self._reset()
             return self._get_state(), 0, False, self._get_info()
 
         self.before_balance = self.balance
 
+        # 행동
+        # 현재 행동에 대한 결과 및 보상 계산
+        # [0, 1, 2] -> ['매수', '매도', '관망']
         if action == 0:
             trading_cost = self.state['Close'] * counts
             if self.cash_balance < trading_cost:
@@ -93,13 +104,22 @@ class data_env:
         self.balance = self.cash_balance + self.stock_balance
         reward = self.balance - self.before_balance
 
-        self.render()
+        if self.render_mode:
+            self.render()
 
+        # 모든 행동 끝나고 다음 스텝 준비
         self.state_pointer += 1
-        if self.state_pointer >= len(self.df):
+        self.episodes += 1
+        
+        # episode 제한없이 처음부터 데이터끝까지 학습할 때
+        # if self.state_pointer >= len(self.df):
+        #     self.done = True
+        
+        # epsode 제한하여 최대 episode만큼만 학습할 때
+        if self.episodes >= self.max_episodes:
             self.done = True
-        else:
-            self.state = self.df.iloc[self.state_pointer]
+
+        self.state = self.df.iloc[self.state_pointer]
 
         return self._get_state(), reward, self.done, self._get_info()
 
@@ -116,9 +136,6 @@ class data_env:
             self.render_mode = True
 
     def render(self):
-        if not self.render_mode:
-            return
-
         plt.figure(figsize=(12,6))
         train_data = self.df.iloc[:self.state_pointer+1]
         x1 = [str(x) for x in train_data['Time']]
@@ -132,5 +149,3 @@ class data_env:
                 plt.scatter(str(time[1]), time[2], c='b')
         plt.xticks(rotation=15)
         plt.show()
-
-data_env('./data/day', '005930', False)
