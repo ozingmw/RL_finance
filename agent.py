@@ -232,8 +232,7 @@ class _agent:
             self.save_episode_reward.append(episode_reward)
 
             if episode % 10 == 0:
-                self.actor.save_weights(f'./model/{self.symbol}_DDPG_actor.h5')
-                self.critic.save_weights(f'./model/{self.symbol}_DDPG_critic.h5')
+                self.save_model()
 
         np.savetxt(f'./model/{self.symbol}_DDPG_episode_reward.txt', self.save_episode_reward, fmt='%.6f')
 
