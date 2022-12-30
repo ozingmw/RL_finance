@@ -155,7 +155,7 @@ class Encoder:
 
         self.dropout = Dropout(dropout_rate, name="%s/dropout" % self.scope)
 
-    def __call__(self, x, padding_mask):
+    def __call__(self, x):
         # x = self.embedding(x)
         x = MultiplyConstant(self.d_model, name="%s/multiply" % self.scope)(x)
         x = Add(name="%s/add" % self.scope)([x, self.pos_encoding(x)])
@@ -163,7 +163,7 @@ class Encoder:
         enc_attention_weights = {}
 
         for i in range(self.num_layers):
-            x, enc_attention = self.enc_layers[i](x, padding_mask)
+            x, enc_attention = self.enc_layers[i](x)
             enc_attention_weights["layer_%d" % i] = enc_attention
 
         return x, enc_attention_weights
@@ -252,8 +252,8 @@ class EncoderLayer:
         self.dropout1 = Dropout(dropout_rate, name="%s/dropout_1" % scope)
         self.dropout2 = Dropout(dropout_rate, name="%s/dropout_2" % scope)
 
-    def __call__(self, x, padding_mask):
-        out1, enc_enc_attention = self.mha1(x, x, x, padding_mask)
+    def __call__(self, x):
+        out1, enc_enc_attention = self.mha1(x, x, x)
         out1 = self.dropout1(out1)
         x = Add(name="%s/add_1" % self.scope)([x, out1])
         x = self.layernorm1(x)
@@ -312,7 +312,7 @@ class MultiHeadAttention:
 
         self.attention = Attention(name="%s/attention" % scope)
 
-    def __call__(self, q, k, v, mask):
+    def __call__(self, q, k, v):
         q = self.wq(q)
         k = self.wk(k)
         v = self.wv(v)
@@ -325,7 +325,7 @@ class MultiHeadAttention:
         k = self.transposek(k)
         v = self.transposev(v)
 
-        x, attention_weights = self.attention([q, k, v, mask])
+        x, attention_weights = self.attention([q, k, v])
 
         x = self.transpose_output(x)
         x = self.reshape_output(x)
@@ -336,14 +336,12 @@ class MultiHeadAttention:
 
 class Attention(Layer):
     def call(self, inputs):
-        q, k, v, mask = inputs
+        q, k, v = inputs
 
         matmul_qk = tf.matmul(q, k, transpose_b=True)
 
         dk = tf.cast(tf.shape(k)[-1], tf.float32)
         scaled_attention_logits = matmul_qk / tf.math.sqrt(dk)
-
-        scaled_attention_logits += mask * -1e9
 
         attention_weights = tf.nn.softmax(scaled_attention_logits, axis=-1)
 

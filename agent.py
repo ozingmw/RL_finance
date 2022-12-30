@@ -1,10 +1,11 @@
 from collections import deque
 import numpy as np
+import tensorflow as tf
 from keras.models import Model
 from keras.layers import Dense, Concatenate, Input, GlobalAveragePooling1D
 from keras.optimizers import Adam
 
-from transformer import Encoder
+from transformer_rm_mask import Encoder
 
 '''
     지금 모델
@@ -32,10 +33,10 @@ class Actor(Model):
         # d_model = input shape / d_model % num_head == 0 / d_ff = dense units
         self.T = Encoder(num_layers=1, d_model=feature, num_heads=5, d_ff=100, dropout_rate=0.3)
         self.G = GlobalAveragePooling1D()
-        self.D = Dense(action_dim, activation='softmax')
+        self.D = Dense(action_dim, activation='tanh')
 
     def call(self, state):
-        x, _ = self.T(state, None)
+        x, _ = self.T(state)
         x = self.G(x)
         x = self.D(x)
 
@@ -62,14 +63,20 @@ class Critic(Model):
         return v
 
 class OO_agent:
-    def __init__(self, symbol, env, time_counts):
+    def __init__(self, symbol, env, time_counts, balance):
+        self.DISCOUNT_FACTOR = 0.95
+        self.BATCH_SIZE = 32
+        self.BUFFER_SIZE = 20000
+        self.TAU = 0.001
+
         self.symbol = symbol
         self.env = env
+        self.TIME_COUNTS = time_counts
+        self.balance = balance
+
         self.action_dim = 3     #[0, 1, 2] -> ['매수', '매도', '관망']
         self.env_state = self.env.df[:self.env.state_pointer+1]
-        self.TIME_COUNTS = time_counts
-        self.feature = len(self.env.columns)-1      # 특성 개수 -> open, close, high, low, volumn 5개
-        self.BATCH_SIZE = 32
+        self.feature = len(self.env.columns)-1      # 특성 개수 -> open, close, high, low, volumn 5개 (Time 제외)
 
         self.actor_input_shape = (None, self.TIME_COUNTS, self.feature)
         self.ACTOR_LEARNING_RATE = 0.0001
@@ -86,30 +93,67 @@ class OO_agent:
         action_in = Input((self.action_dim, ))
         self.critic([state_in, action_in])
         self.target_critic([state_in, action_in])
+
+        # self.actor.summary()
+        # self.critic.summary()
         
         self.actor_optimizer = Adam(learning_rate=self.ACTOR_LEARNING_RATE)
         self.critic_optimizer = Adam(learning_rate=self.CRITIC_LEARNING_RATE)
 
+        self.buffer = deque(maxlen=self.BUFFER_SIZE)
+
         self.save_episode_reward = []
 
-    def get_action(self, action_output):
-        action = np.argmax(action_output)
+    def update_target_network(self, TAU):
+        weights = self.actor.get_weights()
+        target_weights = self.target_actor.get_weights()
+        for index in range(len(weights)):
+            target_weights[index] = TAU * weights[index] + (1-TAU) * target_weights[index]
+        self.target_actor.set_weights(target_weights)
+
+        weights = self.critic.get_weights()
+        target_weights = self.target_critic.get_weights()
+        for index in range(len(weights)):
+            target_weights[index] = TAU * weights[index] + (1-TAU) * target_weights[index]
+        self.target_critic.set_weights(target_weights)
+
+    def ou_noise(self, x, rho=0, mu=0, dt=1e-1, sigma=0.2, loc=0, scale=1, dim=1):
+        return x + rho*(mu - x)*dt + sigma*np.sqrt(dt)*np.random.normal(loc=loc, scale=scale, size=dim)
+
+    def td_target(self, rewards, v_values, dones):
+        td = np.asarray(v_values)
+        for index in range(v_values.shape[0]):
+            td[index] = rewards[index] + (1-dones[index]) * self.DISCOUNT_FACTOR * v_values[index]
+        return td
+        
+    def unpack_batch(self, replay_memory):
+        indices = np.random.randint(len(replay_memory), size=self.BATCH_SIZE)
+        batch = [replay_memory[index] for index in indices]
+        states, actions, rewards, next_states, dones = [
+            np.array(
+                [experience[field_index] for experience in batch]
+            ) for field_index in range(5)
+        ]
+        return states, actions, rewards, next_states, dones
+
+    def actor_learn(self, states):
+        with tf.GradientTape() as tape:
+            actions = self.actor(states, training=True)
+            critic = self.critic([states, actions])
+            loss = -tf.reduce_mean(critic)
+        grads = tape.gradient(loss, self.actor.trainable_variables)
+        self.actor_optimizer.apply_gradients(zip(grads, self.actor.trainable_variables))
+
+    def critic_learn(self, states, actions, td_targets):
+        with tf.GradientTape() as tape:
+            v = self.critic([states, actions], training=True)
+            loss = tf.reduce_mean(tf.square(v - td_targets))
+        grads = tape.gradient(loss, self.critic.trainable_variables)
+        self.critic_optimizer.apply_gradients(zip(grads, self.critic.trainable_variables))
+
+    def get_action(self, action):
+        action = np.argmax(action, axis=1)
         return action
-
-    def unpack_batch(self):
-        pass
-
-    def td_target(self):
-        pass
-
-    def log_pdf(self):
-        pass
-
-    def action_learn(self):
-        pass
-
-    def critic_learn(self):
-        pass
 
     def load_model(self):
         self.actor.load_weights(f'./model/{self.symbol}_actor.h5')
@@ -120,19 +164,78 @@ class OO_agent:
         self.critic.save_weights(f"./model/{self.symbol}_critic.h5")
 
     def train(self):
+        # actor [None, 250, 5] -> time_series_data, feature
+        # critic [5,3] -> feature(current_data), action
         max_episode = 1000
         
+        self.update_target_network(1.0)
+        
         for episode in range(max_episode):
-            self.env._reset()
-            action, value, total_reward, done = 2, 0, 0, False
-            batch_memory = deque(maxlen=self.batch_size)
+            pre_noise = np.zeros(self.action_dim)
+            episode_step, episode_reward, done = 0, 0, False
+            state = self.env._reset()
+            state = state.values.tolist()[0][1:]
 
             while not done:
-                next_state, reward, done, info = self.env.step(action, value)
-                total_reward += reward
+                action = self.actor(tf.convert_to_tensor([state], dtype=tf.float32))
+                noise = self.ou_noise(pre_noise, dim=self.action_dim)
+                action = np.clip(action + [noise], -1, 1)
+                real_action = self.get_action(action)
+
+                # value = self.critic([tf.convert_to_tensor([state], tf.float32), action]).numpy()
                 
-                if done:
-                    break
+                next_state, reward, done, info = self.env.step(real_action, 1)
+                next_state = next_state.values.tolist()[0][1:]
+                
+                # train_reward = (next_state[3] - state[3]) / state[3] * 100
+
+                # 굳이 clipping 해야하나?
+                # 차라리 value clipping 해야하는거 아닌가?
+                # value output으로 주식 매매 비율 정하는건데
+                # 현재 activation 함수가 linear 이면 너무 높거나 낮고
+                # softmax로 변경하면 1로 고정?
+                # value output이 초기에 너무 높음
+                # 매매할때 value output으로 하면 안될거같음
+                # 그럼 뭘로 대체?
+                self.buffer.append((state, action, reward, next_state, done))
+
+                if len(self.buffer) > 100:
+                    states, actions, rewards, next_states, dones = self.unpack_batch(self.buffer)
+                    # 이거 critic 안됨
+                    target_qs = self.target_critic([
+                        tf.convert_to_tensor([next_states], dtype=tf.float32),
+                        self.target_actor(tf.convert_to_tensor([next_states], dtype=tf.float32)).numpy()
+                    ])
+
+                    y_i = self.td_target(rewards, target_qs.numpy(), dones)
+
+                    self.critic_learn(tf.convert_to_tensor([states], dtype=tf.float32),
+                                      tf.convert_to_tensor(actions, dtype=tf.float32),
+                                      tf.convert_to_tensor(y_i, dtype=tf.float32))
+                    self.actor_learn(tf.convert_to_tensor(states, dtype=tf.float32))
+                    self.update_target_network(self.TAU)
+
+                pre_noise = noise
+                state = next_state
+                episode_reward += reward
+                episode_step += 1
+                action_kor = {
+                    0: '매수',
+                    1: '매도',
+                    2: '관망'
+                }
+                print(f'Episode: {episode+1}, Episode_step: {episode_step}, '
+                     +f'Reward: {episode_reward:.3f}, Action: {action_kor[real_action[0]]}\r', end="")
+
+            print(f'Episode: {episode+1}, Episode_step: {episode_step}, '
+                 +f'Reward: {episode_reward:.3f}, Action: {action_kor[real_action[0]]}')
+            self.save_episode_reward.append(episode_reward)
+
+            if episode % 10 == 0:
+                self.actor.save_weights(f'./model/{self.symbol}_a2c_actor.h5')
+                self.critic.save_weights(f'./model/{self.symbol}_a2c_critic.h5')
+
+        np.savetxt(f'./model/{self.symbol}_a2c_episode_reward.txt', self.save_episode_reward, fmt='%.6f')
 
     def predict():
         pass
@@ -141,5 +244,8 @@ class OO_agent:
 from data_env import data_env
 symbol = '005930'
 max_episodes = 250
+input_days = 1
+balance = 100000000
 env = data_env('./data/day', symbol, max_episodes=max_episodes)
-agent = OO_agent(symbol, env, time_counts=max_episodes)
+agent = OO_agent(symbol, env, time_counts=input_days, balance=balance)
+agent.train()

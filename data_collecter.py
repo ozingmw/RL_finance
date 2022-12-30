@@ -45,9 +45,9 @@ def naver_min_crawler(symbol, day) -> pd.DataFrame:
     
     return reversed_df
 
-def naver_day_crawler(symbol, start_day, end_day):
+def naver_day_crawler(symbol, start_day='20100101', end_day=None):
     if not end_day:
-        start_day = end_day = datetime.date.today().strftime("%Y%m%d")
+        end_day = datetime.date.today().strftime("%Y%m%d")
 
     URL = f"https://fchart.stock.naver.com/sise.nhn?symbol={symbol}&timeframe=day&count=10000&requestType=0"
     headers = {'User-agent': 'Mozilla/5.0'}

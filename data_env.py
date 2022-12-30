@@ -7,11 +7,12 @@ class data_env:
         self.path = path
         self.symbol = symbol
         self.render_mode = render_mode
-        self.episodes = 1
+        self.episodes = 0
         self.max_episodes = max_episodes
 
         self.df = pd.read_csv(f'{path}/{symbol}.csv')
         self.state_pointer = random.randint(0, len(self.df)-(self.max_episodes+1))
+        self.start_pointer = self.state_pointer
         self.state = self.df.iloc[self.state_pointer]
         self.columns = self.df.columns
 
@@ -137,7 +138,7 @@ class data_env:
 
     def render(self):
         plt.figure(figsize=(12,6))
-        train_data = self.df.iloc[:self.state_pointer+1]
+        train_data = self.df.iloc[self.start_pointer:self.state_pointer+1]
         x1 = [str(x) for x in train_data['Time']]
         plt.plot(x1, train_data['Close'].values)
         for time in self.time_list:
@@ -148,4 +149,13 @@ class data_env:
             else:
                 plt.scatter(str(time[1]), time[2], c='b')
         plt.xticks(rotation=15)
-        plt.show()
+        # plt.show()
+        plt.show(block=False)
+        plt.pause(3)
+        plt.close()
+
+# env = data_env('./data/day', '005930', render_mode=True)
+
+# for _ in range(10):
+#     print(f'step:{_+1}')
+#     env.step(2)
