@@ -62,7 +62,7 @@ class Critic(Model):
 
         return v
 
-class OO_agent:
+class _agent:
     def __init__(self, symbol, env, time_counts, balance):
         self.DISCOUNT_FACTOR = 0.95
         self.BATCH_SIZE = 32
@@ -156,12 +156,12 @@ class OO_agent:
         return action
 
     def load_model(self):
-        self.actor.load_weights(f'./model/{self.symbol}_actor.h5')
-        self.critic.load_weights(f'./model/{self.symbol}_critic.h5')
+        self.actor.load_weights(f'./model/{self.symbol}_DDPG_actor.h5')
+        self.critic.load_weights(f'./model/{self.symbol}_DDPG_critic.h5')
 
     def save_model(self):
-        self.actor.save_weights(f"./model/{self.symbol}_actor.h5")
-        self.critic.save_weights(f"./model/{self.symbol}_critic.h5")
+        self.actor.save_weights(f"./model/{self.symbol}_DDPG_actor.h5")
+        self.critic.save_weights(f"./model/{self.symbol}_DDPG_critic.h5")
 
     def train(self):
         # actor [None, 250, 5] -> time_series_data, feature
@@ -232,10 +232,10 @@ class OO_agent:
             self.save_episode_reward.append(episode_reward)
 
             if episode % 10 == 0:
-                self.actor.save_weights(f'./model/{self.symbol}_a2c_actor.h5')
-                self.critic.save_weights(f'./model/{self.symbol}_a2c_critic.h5')
+                self.actor.save_weights(f'./model/{self.symbol}_DDPG_actor.h5')
+                self.critic.save_weights(f'./model/{self.symbol}_DDPG_critic.h5')
 
-        np.savetxt(f'./model/{self.symbol}_a2c_episode_reward.txt', self.save_episode_reward, fmt='%.6f')
+        np.savetxt(f'./model/{self.symbol}_DDPG_episode_reward.txt', self.save_episode_reward, fmt='%.6f')
 
     def predict():
         pass
@@ -247,5 +247,5 @@ max_episodes = 250
 input_days = 1
 balance = 100000000
 env = data_env('./data/day', symbol, max_episodes=max_episodes)
-agent = OO_agent(symbol, env, time_counts=input_days, balance=balance)
+agent = _agent(symbol, env, time_counts=input_days, balance=balance)
 agent.train()

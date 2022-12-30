@@ -62,7 +62,7 @@ import agent
 
 SYMBOL = '005930'
 env = data_env('./data/day', SYMBOL, render_mode=False)
-model = agent.OO_agent(symbol=SYMBOL, env=env)
+model = agent.DDPG_agent(symbol=SYMBOL, env=env)
 
 model.load_model()
 
