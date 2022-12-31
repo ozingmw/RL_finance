@@ -81,7 +81,8 @@ class data_env:
             self.time_list.append([0, self.state['Time'], self.state['Close']])
 
         elif action == 1:
-            counts = min(self.buy_counts, counts)
+            counts = self.buy_counts
+            # counts = min(self.buy_counts, counts)
             trading_cost = self.state['Close'] * counts
             if trading_cost < 500000:
                 self.cash_balance -= int(trading_cost * self.tax1)

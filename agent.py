@@ -1,5 +1,8 @@
 from collections import deque
+import datetime
+import logging
 import numpy as np
+import matplotlib.pyplot as plt
 import tensorflow as tf
 from keras.models import Model
 from keras.layers import Dense, Concatenate, Input, GlobalAveragePooling1D
@@ -89,7 +92,7 @@ class _agent:
         
         self.actor.build(input_shape=self.actor_input_shape)
         self.target_actor.build(input_shape=self.actor_input_shape)
-        state_in = Input((self.feature), )
+        state_in = Input((self.feature, ))
         action_in = Input((self.action_dim, ))
         self.critic([state_in, action_in])
         self.target_critic([state_in, action_in])
@@ -103,6 +106,18 @@ class _agent:
         self.buffer = deque(maxlen=self.BUFFER_SIZE)
 
         self.save_episode_reward = []
+        self.logger = self.set_logger()
+
+    def set_logger(self):
+        logger = logging.getLogger()
+        logger.setLevel(logging.DEBUG)
+        formatter = logging.Formatter(u'%(asctime)s %(message)s')
+        file_handler = logging.FileHandler(f'./logs/{datetime.date.today()}_{self.symbol}.log', encoding='utf-8')
+        file_handler.setFormatter(formatter)
+
+        logger.addHandler(file_handler)
+        logger.debug('DEBUG LOGGING')
+        return logger
 
     def update_target_network(self, TAU):
         weights = self.actor.get_weights()
@@ -138,15 +153,16 @@ class _agent:
 
     def actor_learn(self, states):
         with tf.GradientTape() as tape:
+            states = tf.reshape(states, [self.BATCH_SIZE, -1, 5])
             actions = self.actor(states, training=True)
-            critic = self.critic([states, actions])
+            critic = self.critic([states, tf.reshape(actions, [self.BATCH_SIZE, -1, 3])])
             loss = -tf.reduce_mean(critic)
         grads = tape.gradient(loss, self.actor.trainable_variables)
         self.actor_optimizer.apply_gradients(zip(grads, self.actor.trainable_variables))
 
     def critic_learn(self, states, actions, td_targets):
         with tf.GradientTape() as tape:
-            v = self.critic([states, actions], training=True)
+            v = self.critic([tf.reshape(states, [self.BATCH_SIZE, -1, 5]), actions], training=True)
             loss = tf.reduce_mean(tf.square(v - td_targets))
         grads = tape.gradient(loss, self.critic.trainable_variables)
         self.critic_optimizer.apply_gradients(zip(grads, self.critic.trainable_variables))
@@ -167,6 +183,7 @@ class _agent:
         # actor [None, 250, 5] -> time_series_data, feature
         # critic [5,3] -> feature(current_data), action
         max_episode = 1000
+        total_reward = 0
         
         self.update_target_network(1.0)
         
@@ -194,22 +211,21 @@ class _agent:
                 # value output으로 주식 매매 비율 정하는건데
                 # 현재 activation 함수가 linear 이면 너무 높거나 낮고
                 # softmax로 변경하면 1로 고정?
-                # value output이 초기에 너무 높음
+                # value output이 초기에 너무 높음 -> 후반에는 몰?루
                 # 매매할때 value output으로 하면 안될거같음
                 # 그럼 뭘로 대체?
                 self.buffer.append((state, action, reward, next_state, done))
 
-                if len(self.buffer) > 100:
+                if len(self.buffer) > 1000:
                     states, actions, rewards, next_states, dones = self.unpack_batch(self.buffer)
-                    # 이거 critic 안됨
                     target_qs = self.target_critic([
-                        tf.convert_to_tensor([next_states], dtype=tf.float32),
-                        self.target_actor(tf.convert_to_tensor([next_states], dtype=tf.float32)).numpy()
+                        tf.convert_to_tensor(next_states, dtype=tf.float32),
+                        self.target_actor(tf.reshape(tf.cast(next_states, dtype=tf.float32), [self.BATCH_SIZE, -1, 5]))
                     ])
 
                     y_i = self.td_target(rewards, target_qs.numpy(), dones)
 
-                    self.critic_learn(tf.convert_to_tensor([states], dtype=tf.float32),
+                    self.critic_learn(tf.convert_to_tensor(states, dtype=tf.float32),
                                       tf.convert_to_tensor(actions, dtype=tf.float32),
                                       tf.convert_to_tensor(y_i, dtype=tf.float32))
                     self.actor_learn(tf.convert_to_tensor(states, dtype=tf.float32))
@@ -226,9 +242,14 @@ class _agent:
                 }
                 print(f'Episode: {episode+1}, Episode_step: {episode_step}, '
                      +f'Reward: {episode_reward:.3f}, Action: {action_kor[real_action[0]]}\r', end="")
+                self.logger.debug(f'EPISODE: {episode+1}, EPISODE_STEP: {episode_step}, STATE: {state[3]}, NEXT_STATE: {next_state[3]}, '
+                                 +f'ACTION: {action_kor[real_action[0]]}, REWRD: {reward}, EPISODE_REWARD: {episode_reward}')
 
+            total_reward += episode_reward
             print(f'Episode: {episode+1}, Episode_step: {episode_step}, '
-                 +f'Reward: {episode_reward:.3f}, Action: {action_kor[real_action[0]]}')
+                 +f'Reward: {episode_reward:.3f}, Action: {action_kor[real_action[0]]}, Total: {total_reward:.3f}')
+            self.logger.debug(f'EPISODE: {episode+1}, EPISODE_STEP: {episode_step}, STATE: {state[3]}, NEXT_STATE: {next_state[3]}, '
+                             +f'ACTION: {action_kor[real_action[0]]}, REWRD: {reward}, EPISODE_REWARD: {episode_reward}')
             self.save_episode_reward.append(episode_reward)
 
             if episode % 10 == 0:
@@ -239,12 +260,17 @@ class _agent:
     def predict():
         pass
 
+    def plot_result(self):
+        plt.plot(self.save_episode_reward)
+        plt.show()
+
 
 from data_env import data_env
 symbol = '005930'
-max_episodes = 250
+max_episodes = 200
 input_days = 1
 balance = 100000000
 env = data_env('./data/day', symbol, max_episodes=max_episodes)
 agent = _agent(symbol, env, time_counts=input_days, balance=balance)
 agent.train()
+agent.plot_result()

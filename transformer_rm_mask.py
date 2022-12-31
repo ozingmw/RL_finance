@@ -158,7 +158,7 @@ class Encoder:
     def __call__(self, x):
         # x = self.embedding(x)
         x = MultiplyConstant(self.d_model, name="%s/multiply" % self.scope)(x)
-        x = Add(name="%s/add" % self.scope)([x, self.pos_encoding(x)])
+        # x = Add(name="%s/add" % self.scope)([x, self.pos_encoding(x)])
 
         enc_attention_weights = {}
 
