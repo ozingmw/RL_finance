@@ -61,13 +61,17 @@ from data_env import data_env
 import agent
 
 SYMBOL = '005930'
-env = data_env('./data/day', SYMBOL, render_mode=False)
-model = agent.DDPG_agent(symbol=SYMBOL, env=env)
-
-model.load_model()
 
 stock_env.auth()
-stock_env.current_account()
+account = stock_env.current_account()
+balance = int(account['output2'][0]['tot_evlu_amt'])
+
+max_episode = 250
+input_days = 1
+env = data_env('./data/day', SYMBOL, max_episodes=max_episode, balance=balance, render_mode=False)
+
+model = agent.DDPG_agent(SYMBOL, env, time_counts=input_days, balance=balance)
+model.load_model()
 
 sys_time = time_check.check()
 if sys_time == "w1":
@@ -85,7 +89,7 @@ print("장 중")
 while time_check.check() == 'd':
 
     symbol_price = stock_env.current_price(SYMBOL)
-    action, value = model.predict(symbol_price)
+    action = model.predict(symbol_price)
 
     stock_list = stock_env.current_account()['output1']
     evaluation = stock_env.current_account()['output2'][0]

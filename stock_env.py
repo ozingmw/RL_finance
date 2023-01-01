@@ -77,6 +77,35 @@ def current_account():
     print(f"=====================")
     return res.json()
 
+def available_balance_to_buy(symbol, price):
+    PATH = "uapi/domestic-stock/v1/trading/inquire-psbl-order"
+    URL = f"{URL_BASE}/{PATH}"
+    headers = {
+        "Content-Type":"application/json", 
+        "authorization":f"Bearer {ACCESS_TOKEN}",
+        "appKey":APP_KEY,
+        "appSecret":APP_SECRET,
+        "tr_id":"VTTC8908R",
+        "custtype":"P",
+    }
+    params = {
+        "CANO": CANO,
+        "ACNT_PRDT_CD": "",
+        "PDNO": symbol,
+        "ORD_UNPR": str(price),
+        "ORD_DVSN": "00",
+        "CMA_EVLU_AMT_ICLD_YN": "N",
+        "OVRS_ICLD_YN": "N"
+    }
+    res = requests.get(URL, headers=headers, params=params)
+    print(res.json())
+
+    print(f"{symbol}주식 {price}원"
+         +f"현재 주문 가능 금액: {res.json['output']['ord_psbl_cash']}"
+         +f"주문 가능 수량: {res.json['output']['nrcvb_buy_qty']}")
+
+    return res.json()
+
 def complete(start_time=None, end_time=None):
     '''
     FORMAT: 'YYYYMMDD'

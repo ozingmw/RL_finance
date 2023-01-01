@@ -65,7 +65,7 @@ class Critic(Model):
 
         return v
 
-class _agent:
+class DDPG_agent:
     def __init__(self, symbol, env, time_counts, balance):
         self.DISCOUNT_FACTOR = 0.95
         self.BATCH_SIZE = 32
@@ -106,7 +106,12 @@ class _agent:
         self.buffer = deque(maxlen=self.BUFFER_SIZE)
 
         self.save_episode_reward = []
-        self.logger = self.set_logger()
+
+        self.action_kor = {
+            0: '매수',
+            1: '매도',
+            2: '관망'
+        }
 
     def set_logger(self):
         logger = logging.getLogger()
@@ -176,15 +181,15 @@ class _agent:
         self.critic.load_weights(f'./model/{self.symbol}_DDPG_critic.h5')
 
     def save_model(self):
-        self.actor.save_weights(f"./model/{self.symbol}_DDPG_actor.h5")
-        self.critic.save_weights(f"./model/{self.symbol}_DDPG_critic.h5")
+        self.actor.save_weights(f"./model/train/{self.symbol}_DDPG_actor.h5")
+        self.critic.save_weights(f"./model/train/{self.symbol}_DDPG_critic.h5")
 
-    def train(self):
+    def train(self, max_episode=500):
         # actor [None, 250, 5] -> time_series_data, feature
-        # critic [5,3] -> feature(current_data), action
-        max_episode = 1000
+        # critic [(5,), (3,)] -> feature(current_data), action
         total_reward = 0
-        
+
+        logger = self.set_logger()
         self.update_target_network(1.0)
         
         for episode in range(max_episode):
@@ -235,30 +240,43 @@ class _agent:
                 state = next_state
                 episode_reward += reward
                 episode_step += 1
-                action_kor = {
-                    0: '매수',
-                    1: '매도',
-                    2: '관망'
-                }
+                
                 print(f'Episode: {episode+1}, Episode_step: {episode_step}, '
-                     +f'Reward: {episode_reward:.3f}, Action: {action_kor[real_action[0]]}\r', end="")
-                self.logger.debug(f'EPISODE: {episode+1}, EPISODE_STEP: {episode_step}, STATE: {state[3]}, NEXT_STATE: {next_state[3]}, '
-                                 +f'ACTION: {action_kor[real_action[0]]}, REWRD: {reward}, EPISODE_REWARD: {episode_reward}')
+                     +f'Reward: {episode_reward:.3f}, Action: {self.action_kor[real_action[0]]}\r', end="")
+                logger.debug(f'EPISODE: {episode+1}, EPISODE_STEP: {episode_step}, STATE: {state[3]}, NEXT_STATE: {next_state[3]}, '
+                                 +f'ACTION: {self.action_kor[real_action[0]]}, REWRD: {reward}, EPISODE_REWARD: {episode_reward}')
 
             total_reward += episode_reward
             print(f'Episode: {episode+1}, Episode_step: {episode_step}, '
-                 +f'Reward: {episode_reward:.3f}, Action: {action_kor[real_action[0]]}, Total: {total_reward:.3f}')
-            self.logger.debug(f'EPISODE: {episode+1}, EPISODE_STEP: {episode_step}, STATE: {state[3]}, NEXT_STATE: {next_state[3]}, '
-                             +f'ACTION: {action_kor[real_action[0]]}, REWRD: {reward}, EPISODE_REWARD: {episode_reward}')
+                 +f'Reward: {episode_reward:.3f}, Action: {self.action_kor[real_action[0]]}, Total: {total_reward:.3f}')
+            logger.debug(f'EPISODE: {episode+1}, EPISODE_STEP: {episode_step}, STATE: {state[3]}, NEXT_STATE: {next_state[3]}, '
+                             +f'ACTION: {self.action_kor[real_action[0]]}, REWRD: {reward}, EPISODE_REWARD: {episode_reward}')
             self.save_episode_reward.append(episode_reward)
 
             if episode % 10 == 0:
                 self.save_model()
 
-        np.savetxt(f'./model/{self.symbol}_DDPG_episode_reward.txt', self.save_episode_reward, fmt='%.6f')
+    def validation(self):
+        state = self.env._reset(training=False)
+        state = state.values.tolist()[0][1:]
 
-    def predict():
-        pass
+        episode_reward, done = 0, False
+        print("Validation:")
+        while not done:
+            action = self.actor(tf.convert_to_tensor([state], dtype=tf.float32))
+            real_action = self.get_action(action)
+            state, reward, done, info = self.env.step(real_action, 1)
+            state = state.values.tolist()[0][1:]
+            episode_reward += reward
+            print(f'Reward: {episode_reward:.3f}, Action: {self.action_kor[real_action[0]]}')
+        self.env.render()
+
+    def predict(self, env):
+        state = env._reset(training=False)
+        state = state.values.tolist()[0][1:]
+        action = self.actor(tf.convert_to_tensor(state, dtype=tf.float32))
+        action = self.get_action(action)
+        return action
 
     def plot_result(self):
         plt.plot(self.save_episode_reward)
@@ -266,11 +284,12 @@ class _agent:
 
 
 from data_env import data_env
-symbol = '005930'
-max_episodes = 200
+symbol = '052400'
+max_episodes_step = 250
+max_episodes = 500
 input_days = 1
 balance = 100000000
-env = data_env('./data/day', symbol, max_episodes=max_episodes)
-agent = _agent(symbol, env, time_counts=input_days, balance=balance)
-agent.train()
+env = data_env('./data/day', symbol, max_episodes_step=max_episodes_step, balance=balance)
+agent = DDPG_agent(symbol, env, time_counts=input_days, balance=balance)
+agent.train(max_episode=max_episodes)
 agent.plot_result()

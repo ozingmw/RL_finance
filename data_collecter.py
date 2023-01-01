@@ -120,7 +120,7 @@ def update_all_csv():
     for data in data_list:
         symbol = data.split(".")
         update_csv(symbol[0])
-    # data_list = os.listdir('./data/day')
-    # for data in data_list:
-    #     symbol = data.split(".")
-    #     naver_day_crawler(symbol[0])
+    data_list = os.listdir('./data/day')
+    for data in data_list:
+        symbol = data.split(".")
+        naver_day_crawler(symbol[0])

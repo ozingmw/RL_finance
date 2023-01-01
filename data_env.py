@@ -3,20 +3,24 @@ import matplotlib.pyplot as plt
 import random
 
 class data_env:
-    def __init__(self, path, symbol, max_episodes=250, render_mode=False):
+    def __init__(self, path, symbol, max_episodes_step=250, balance=100000000, training=True, render_mode=False):
         self.path = path
         self.symbol = symbol
         self.render_mode = render_mode
         self.episodes = 0
-        self.max_episodes = max_episodes
+        self.max_episodes_step = max_episodes_step
+        self.training = training
 
         self.df = pd.read_csv(f'{path}/{symbol}.csv')
-        self.state_pointer = random.randint(0, len(self.df)-(self.max_episodes+1))
+        if training:
+            self.state_pointer = random.randint(0, len(self.df)-(self.max_episodes_step+1))
+        else:
+            self.state_pointer = len(self.df)-max_episodes_step-1
         self.start_pointer = self.state_pointer
         self.state = self.df.iloc[self.state_pointer]
         self.columns = self.df.columns
 
-        self.balance = 100000000
+        self.balance = balance
         self.cash_balance = self.balance
         self.stock_balance = 0
         self.tax1 = 0.004971487
@@ -29,8 +33,8 @@ class data_env:
         self.time_list = []
         self.done = False
 
-    def _reset(self):
-        self.__init__(self.path, self.symbol)
+    def _reset(self, **kwargs):
+        self.__init__(self.path, self.symbol, self.max_episodes_step, self.balance, **kwargs)
         return self._get_state()
 
     def step(self, action, counts=0):
@@ -117,8 +121,8 @@ class data_env:
         # if self.state_pointer >= len(self.df):
         #     self.done = True
         
-        # epsode 제한하여 최대 episode만큼만 학습할 때
-        if self.episodes >= self.max_episodes:
+        # episode 제한하여 최대 episode만큼만 학습할 때
+        if self.episodes >= self.max_episodes_step:
             self.done = True
 
         self.state = self.df.iloc[self.state_pointer]
@@ -150,13 +154,7 @@ class data_env:
             else:
                 plt.scatter(str(time[1]), time[2], c='b')
         plt.xticks(rotation=15)
-        # plt.show()
-        plt.show(block=False)
-        plt.pause(3)
-        plt.close()
-
-# env = data_env('./data/day', '005930', render_mode=True)
-
-# for _ in range(10):
-#     print(f'step:{_+1}')
-#     env.step(2)
+        plt.show()
+        # plt.show(block=False)
+        # plt.pause(3)
+        # plt.close()
