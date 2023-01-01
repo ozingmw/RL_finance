@@ -33,7 +33,7 @@ class data_env:
         self.time_list = []
         self.done = False
 
-    def _reset(self, **kwargs):
+    def reset(self, **kwargs):
         self.__init__(self.path, self.symbol, self.max_episodes_step, self.balance, **kwargs)
         return self._get_state()
 
@@ -55,7 +55,7 @@ class data_env:
         '''
 
         if self.done:
-            self._reset()
+            self.reset()
             return self._get_state(), 0, False, self._get_info()
 
         self.before_balance = self.balance
@@ -128,6 +128,9 @@ class data_env:
         self.state = self.df.iloc[self.state_pointer]
 
         return self._get_state(), reward, self.done, self._get_info()
+
+    def stack_step(self, count):
+        return self.df.iloc[self.state_pointer:self.state_pointer+count]
 
     def _get_state(self):
         return self.df.iloc[self.state_pointer:self.state_pointer+1]

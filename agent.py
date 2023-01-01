@@ -66,7 +66,7 @@ class Critic(Model):
         return v
 
 class DDPG_agent:
-    def __init__(self, symbol, env, time_counts, balance):
+    def __init__(self, symbol, env, time_counts=5, balance=100000000):
         self.DISCOUNT_FACTOR = 0.95
         self.BATCH_SIZE = 32
         self.BUFFER_SIZE = 20000
@@ -92,8 +92,9 @@ class DDPG_agent:
         
         self.actor.build(input_shape=self.actor_input_shape)
         self.target_actor.build(input_shape=self.actor_input_shape)
-        state_in = Input((self.feature, ))
-        action_in = Input((self.action_dim, ))
+        # concat error
+        state_in = Input((self.TIME_COUNTS, self.feature, ))
+        action_in = Input((1, self.action_dim, ))
         self.critic([state_in, action_in])
         self.target_critic([state_in, action_in])
 
@@ -167,7 +168,7 @@ class DDPG_agent:
 
     def critic_learn(self, states, actions, td_targets):
         with tf.GradientTape() as tape:
-            v = self.critic([tf.reshape(states, [self.BATCH_SIZE, -1, 5]), actions], training=True)
+            v = self.critic([states, actions], training=True)
             loss = tf.reduce_mean(tf.square(v - td_targets))
         grads = tape.gradient(loss, self.critic.trainable_variables)
         self.critic_optimizer.apply_gradients(zip(grads, self.critic.trainable_variables))
@@ -195,16 +196,20 @@ class DDPG_agent:
         for episode in range(max_episode):
             pre_noise = np.zeros(self.action_dim)
             episode_step, episode_reward, done = 0, 0, False
-            state = self.env._reset()
+            state = self.env.reset()
             state = state.values.tolist()[0][1:]
 
+            # state [batch_size, 1, 5] 에서 [batch_size, time_counts, 5]로 변환중
             while not done:
-                action = self.actor(tf.convert_to_tensor([state], dtype=tf.float32))
+                state_list = self.env.stack_step(self.TIME_COUNTS)
+                state_list = state_list.drop(['Time'], axis=1).values.tolist()
+
+                action = self.actor(tf.convert_to_tensor([state_list], dtype=tf.float32))
                 noise = self.ou_noise(pre_noise, dim=self.action_dim)
                 action = np.clip(action + [noise], -1, 1)
                 real_action = self.get_action(action)
 
-                # value = self.critic([tf.convert_to_tensor([state], tf.float32), action]).numpy()
+                value = self.critic([tf.convert_to_tensor([state_list], tf.float32), action]).numpy()
                 
                 next_state, reward, done, info = self.env.step(real_action, 1)
                 next_state = next_state.values.tolist()[0][1:]
@@ -219,9 +224,9 @@ class DDPG_agent:
                 # value output이 초기에 너무 높음 -> 후반에는 몰?루
                 # 매매할때 value output으로 하면 안될거같음
                 # 그럼 뭘로 대체?
-                self.buffer.append((state, action, reward, next_state, done))
+                self.buffer.append((state_list, action, reward, next_state, done))
 
-                if len(self.buffer) > 1000:
+                if len(self.buffer) > 10:
                     states, actions, rewards, next_states, dones = self.unpack_batch(self.buffer)
                     target_qs = self.target_critic([
                         tf.convert_to_tensor(next_states, dtype=tf.float32),
@@ -257,7 +262,7 @@ class DDPG_agent:
                 self.save_model()
 
     def validation(self):
-        state = self.env._reset(training=False)
+        state = self.env.reset(training=False)
         state = state.values.tolist()[0][1:]
 
         episode_reward, done = 0, False
@@ -272,7 +277,7 @@ class DDPG_agent:
         self.env.render()
 
     def predict(self, env):
-        state = env._reset(training=False)
+        state = env.reset(training=False)
         state = state.values.tolist()[0][1:]
         action = self.actor(tf.convert_to_tensor(state, dtype=tf.float32))
         action = self.get_action(action)
@@ -287,7 +292,7 @@ from data_env import data_env
 symbol = '052400'
 max_episodes_step = 250
 max_episodes = 500
-input_days = 1
+input_days = 5
 balance = 100000000
 env = data_env('./data/day', symbol, max_episodes_step=max_episodes_step, balance=balance)
 agent = DDPG_agent(symbol, env, time_counts=input_days, balance=balance)
