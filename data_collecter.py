@@ -124,3 +124,5 @@ def update_all_csv():
     for data in data_list:
         symbol = data.split(".")
         naver_day_crawler(symbol[0])
+
+# update_all_csv()

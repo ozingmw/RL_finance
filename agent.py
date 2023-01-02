@@ -46,22 +46,25 @@ class Actor(Model):
         return x
 
 class Critic(Model):
-    def __init__(self):
+    def __init__(self, feature):
         super(Critic, self).__init__()
 
-        self.x1 = Dense(64, activation='relu')
-        self.h2 = Dense(32, activation='relu')
-        self.h3 = Dense(16, activation='relu')
-        self.q = Dense(1, activation='linear')
+        self.T = Encoder(num_layers=3, d_model=feature, num_heads=5, d_ff=100, dropout_rate=0.3)
+        self.G = GlobalAveragePooling1D()
+        self.X1 = Dense(16, activation='relu')
+        self.X2 = Dense(feature, activation='relu')
+        self.D = Dense(1, activation='linear')
+
 
     def call(self, state_action):
         state, action = state_action[0], state_action[1]
         
-        x = self.x1(state)
-        x_a = Concatenate(axis=-1)([x, action])
-        v = self.h2(x_a)
-        v = self.h3(v)
-        v = self.q(v)
+        x, _ = self.T(state)
+        x = self.G(x)
+        a = self.X1(action)
+        a = self.X2(a)
+        x_a = Concatenate(axis=-1)([x, a])
+        v = self.D(x_a)
 
         return v
 
@@ -87,13 +90,13 @@ class DDPG_agent:
 
         self.actor = Actor(action_dim=self.action_dim, feature=self.feature)
         self.target_actor = Actor(action_dim=self.action_dim, feature=self.feature)
-        self.critic = Critic()
-        self.target_critic = Critic()
+        self.critic = Critic(feature=self.feature)
+        self.target_critic = Critic(feature=self.feature)
         
         self.actor.build(input_shape=self.actor_input_shape)
         self.target_actor.build(input_shape=self.actor_input_shape)
         state_in = Input((self.TIME_COUNTS, self.feature, ))
-        action_in = Input((1, self.action_dim, ))
+        action_in = Input((self.action_dim, ))
         self.critic([state_in, action_in])
         self.target_critic([state_in, action_in])
 
@@ -158,16 +161,15 @@ class DDPG_agent:
 
     def actor_learn(self, states):
         with tf.GradientTape() as tape:
-            states = tf.reshape(states, [self.BATCH_SIZE, -1, 5])
             actions = self.actor(states, training=True)
-            critic = self.critic([states, tf.reshape(actions, [self.BATCH_SIZE, -1, 3])])
+            critic = self.critic([states, actions])
             loss = -tf.reduce_mean(critic)
         grads = tape.gradient(loss, self.actor.trainable_variables)
         self.actor_optimizer.apply_gradients(zip(grads, self.actor.trainable_variables))
 
     def critic_learn(self, states, actions, td_targets):
         with tf.GradientTape() as tape:
-            v = self.critic([states, actions], training=True)
+            v = self.critic([states, tf.squeeze(actions)], training=True)
             loss = tf.reduce_mean(tf.square(v - td_targets))
         grads = tape.gradient(loss, self.critic.trainable_variables)
         self.critic_optimizer.apply_gradients(zip(grads, self.critic.trainable_variables))
@@ -177,16 +179,14 @@ class DDPG_agent:
         return action
 
     def load_model(self):
-        self.actor.load_weights(f'./model/{self.symbol}_DDPG_actor.h5')
-        self.critic.load_weights(f'./model/{self.symbol}_DDPG_critic.h5')
+        self.actor.load_weights(f'./model/{self.symbol}_{self.TIME_COUNTS}D_DDPG_actor.h5')
+        self.critic.load_weights(f'./model/{self.symbol}_{self.TIME_COUNTS}D_DDPG_critic.h5')
 
     def save_model(self):
-        self.actor.save_weights(f"./model/train/{self.symbol}_DDPG_actor.h5")
-        self.critic.save_weights(f"./model/train/{self.symbol}_DDPG_critic.h5")
+        self.actor.save_weights(f"./model/train/{self.symbol}_{self.TIME_COUNTS}D_DDPG_actor.h5")
+        self.critic.save_weights(f"./model/train/{self.symbol}_{self.TIME_COUNTS}D_DDPG_critic.h5")
 
     def train(self, max_episode=500):
-        # actor [None, 250, 5] -> time_series_data, feature
-        # critic [(5,), (3,)] -> feature(current_data), action
         total_reward = 0
 
         logger = self.set_logger()
@@ -208,7 +208,7 @@ class DDPG_agent:
                 action = np.clip(action + [noise], -1, 1)
                 real_action = self.get_action(action)
 
-                value = self.critic([tf.convert_to_tensor([state_list], tf.float32), action]).numpy()
+                # value = self.critic([tf.convert_to_tensor([state_list], tf.float32), action]).numpy()
                 
                 next_state, reward, done, info = self.env.step(real_action, 1)
                 next_state = next_state.values.tolist()[0][1:]
@@ -225,11 +225,11 @@ class DDPG_agent:
                 # 그럼 뭘로 대체?
                 self.buffer.append((state_list, action, reward, next_state, done))
 
-                if len(self.buffer) > 10:
+                if len(self.buffer) > 1000:
                     states, actions, rewards, next_states, dones = self.unpack_batch(self.buffer)
                     target_qs = self.target_critic([
                         tf.convert_to_tensor(next_states, dtype=tf.float32),
-                        self.target_actor(tf.reshape(tf.cast(next_states, dtype=tf.float32), [self.BATCH_SIZE, -1, 5]))
+                        self.target_actor(tf.cast(next_states, dtype=tf.float32))
                     ])
 
                     y_i = self.td_target(rewards, target_qs.numpy(), dones)
@@ -248,13 +248,13 @@ class DDPG_agent:
                 print(f'Episode: {episode+1}, Episode_step: {episode_step}, '
                      +f'Reward: {episode_reward:.3f}, Action: {self.action_kor[real_action[0]]}\r', end="")
                 logger.debug(f'EPISODE: {episode+1}, EPISODE_STEP: {episode_step}, STATE: {state[3]}, NEXT_STATE: {next_state[3]}, '
-                                 +f'ACTION: {self.action_kor[real_action[0]]}, REWRD: {reward}, EPISODE_REWARD: {episode_reward}')
+                            +f'ACTION: {self.action_kor[real_action[0]]}, REWARD: {reward}, EPISODE_REWARD: {episode_reward:.3f}')
 
             total_reward += episode_reward
             print(f'Episode: {episode+1}, Episode_step: {episode_step}, '
                  +f'Reward: {episode_reward:.3f}, Action: {self.action_kor[real_action[0]]}, Total: {total_reward:.3f}')
             logger.debug(f'EPISODE: {episode+1}, EPISODE_STEP: {episode_step}, STATE: {state[3]}, NEXT_STATE: {next_state[3]}, '
-                             +f'ACTION: {self.action_kor[real_action[0]]}, REWRD: {reward}, EPISODE_REWARD: {episode_reward}')
+                        +f'ACTION: {self.action_kor[real_action[0]]}, REWARD: {reward}, EPISODE_REWARD: {episode_reward:3f}')
             self.save_episode_reward.append(episode_reward)
 
             if episode % 10 == 0:
@@ -288,7 +288,7 @@ class DDPG_agent:
 
 
 from data_env import data_env
-symbol = '052400'
+symbol = '005930'
 max_episodes_step = 250
 max_episodes = 500
 input_days = 5
