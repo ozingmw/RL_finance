@@ -34,7 +34,7 @@ class Actor(Model):
         super(Actor, self).__init__()
         
         # d_model = input shape / d_model % num_head == 0 / d_ff = dense units
-        self.T = Encoder(num_layers=1, d_model=feature, num_heads=5, d_ff=100, dropout_rate=0.3)
+        self.T = Encoder(num_layers=3, d_model=feature, num_heads=5, d_ff=100, dropout_rate=0.3)
         self.G = GlobalAveragePooling1D()
         self.D = Dense(action_dim, activation='tanh')
 
@@ -92,7 +92,6 @@ class DDPG_agent:
         
         self.actor.build(input_shape=self.actor_input_shape)
         self.target_actor.build(input_shape=self.actor_input_shape)
-        # concat error
         state_in = Input((self.TIME_COUNTS, self.feature, ))
         action_in = Input((1, self.action_dim, ))
         self.critic([state_in, action_in])
