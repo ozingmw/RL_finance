@@ -3,19 +3,19 @@ import matplotlib.pyplot as plt
 import random
 
 class data_env:
-    def __init__(self, path, symbol, max_episodes_step=250, balance=100000000, training=True, render_mode=False):
+    def __init__(self, path, symbol, max_episodes_step=250, time_counts=5, balance=100000000, training=True):
         self.path = path
         self.symbol = symbol
-        self.render_mode = render_mode
         self.episodes = 0
         self.max_episodes_step = max_episodes_step
+        self.time_counts = time_counts
         self.training = training
 
         self.df = pd.read_csv(f'{path}/{symbol}.csv')
         if training:
-            self.state_pointer = random.randint(0, len(self.df)-(self.max_episodes_step+1))
+            self.state_pointer = random.randint(self.time_counts-1, len(self.df)-(self.max_episodes_step+1))
         else:
-            self.state_pointer = len(self.df)-max_episodes_step-1
+            self.state_pointer = len(self.df)-(self.max_episodes_step+1)
         self.start_pointer = self.state_pointer
         self.state = self.df.iloc[self.state_pointer]
         self.columns = self.df.columns
@@ -34,7 +34,7 @@ class data_env:
         self.done = False
 
     def reset(self, **kwargs):
-        self.__init__(self.path, self.symbol, self.max_episodes_step, self.balance, **kwargs)
+        self.__init__(self.path, self.symbol, self.max_episodes_step, self.time_counts, self.balance, **kwargs)
         return self._get_state()
 
     def step(self, action, counts=0):
@@ -110,8 +110,8 @@ class data_env:
         self.balance = self.cash_balance + self.stock_balance
         reward = self.balance - self.before_balance
 
-        if self.render_mode:
-            self.render()
+        # if self.render_mode:
+        #     self.render()
 
         # 모든 행동 끝나고 다음 스텝 준비
         self.state_pointer += 1
@@ -129,8 +129,8 @@ class data_env:
 
         return self._get_state(), reward, self.done, self._get_info()
 
-    def stack_step(self, count):
-        return self.df.iloc[self.state_pointer:self.state_pointer+count]
+    def stack_step(self):
+        return self.df.iloc[self.state_pointer-self.time_counts+1:self.state_pointer+1]
 
     def _get_state(self):
         return self.df.iloc[self.state_pointer:self.state_pointer+1]
@@ -138,26 +138,18 @@ class data_env:
     def _get_info(self):
         return {'balance': self.balance, 'stock_balance': self.stock_balance, 'cash_balance': self.cash_balance, 'buy_average': self.buy_average}
 
-    def _change_render(self):
-        if self.render_mode:
-            self.render_mode = False
-        else:
-            self.render_mode = True
-
-    def render(self):
+    def render(self, string):
         plt.figure(figsize=(12,6))
         train_data = self.df.iloc[self.start_pointer:self.state_pointer+1]
         x1 = [str(x) for x in train_data['Time']]
         plt.plot(x1, train_data['Close'].values)
         for time in self.time_list:
-            plt.annotate(f'{"BUY" if time[0] == 0 else "SELL"}', xy=(str(time[1]), time[2]), xytext=(str(time[1]), time[2]+300),
-                         fontsize=14, arrowprops=dict(facecolor='black', width=1, shrink=0.1, headwidth=10))
+            # plt.annotate(f'{"BUY" if time[0] == 0 else "SELL"}', xy=(str(time[1]), time[2]), xytext=(str(time[1]), time[2]+300),
+            #              fontsize=14, arrowprops=dict(facecolor='black', width=1, shrink=0.1, headwidth=10))
             if time[0]:
                 plt.scatter(str(time[1]), time[2], c='r')
             else:
                 plt.scatter(str(time[1]), time[2], c='b')
         plt.xticks(rotation=15)
-        plt.show()
-        # plt.show(block=False)
-        # plt.pause(3)
-        # plt.close()
+        # plt.show()
+        plt.savefig(f'./logs/img/{string}', dpi=200)

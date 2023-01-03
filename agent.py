@@ -72,7 +72,7 @@ class DDPG_agent:
     def __init__(self, symbol, env, time_counts=5, balance=100000000):
         self.DISCOUNT_FACTOR = 0.95
         self.BATCH_SIZE = 32
-        self.BUFFER_SIZE = 20000
+        self.BUFFER_SIZE = 1000000
         self.TAU = 0.001
 
         self.symbol = symbol
@@ -81,7 +81,6 @@ class DDPG_agent:
         self.balance = balance
 
         self.action_dim = 3     #[0, 1, 2] -> ['매수', '매도', '관망']
-        self.env_state = self.env.df[:self.env.state_pointer+1]
         self.feature = len(self.env.columns)-1      # 특성 개수 -> open, close, high, low, volumn 5개 (Time 제외)
 
         self.actor_input_shape = (None, self.TIME_COUNTS, self.feature)
@@ -200,7 +199,7 @@ class DDPG_agent:
 
             # state [batch_size, 1, 5] 에서 [batch_size, time_counts, 5]로 변환중
             while not done:
-                state_list = self.env.stack_step(self.TIME_COUNTS)
+                state_list = self.env.stack_step()
                 state_list = state_list.drop(['Time'], axis=1).values.tolist()
 
                 action = self.actor(tf.convert_to_tensor([state_list], dtype=tf.float32))
@@ -260,6 +259,9 @@ class DDPG_agent:
             if episode % 10 == 0:
                 self.save_model()
 
+            if episode % 100 == 0:
+                self.env.render(f'{self.symbol}_{self.TIME_COUNTS}D_DDPG_{episode}')
+
     def validation(self):
         state = self.env.reset(training=False)
         state = state.values.tolist()[0][1:]
@@ -267,7 +269,10 @@ class DDPG_agent:
         episode_reward, done = 0, False
         print("Validation:")
         while not done:
-            action = self.actor(tf.convert_to_tensor([state], dtype=tf.float32))
+            state_list = self.env.stack_step()
+            state_list = state_list.drop(['Time'], axis=1).values.tolist()
+
+            action = self.actor(tf.convert_to_tensor([state_list], dtype=tf.float32))
             real_action = self.get_action(action)
             state, reward, done, info = self.env.step(real_action, 1)
             state = state.values.tolist()[0][1:]
@@ -275,12 +280,10 @@ class DDPG_agent:
             print(f'Reward: {episode_reward:.3f}, Action: {self.action_kor[real_action[0]]}')
         self.env.render()
 
-    def predict(self, env):
-        state = env.reset(training=False)
-        state = state.values.tolist()[0][1:]
-        action = self.actor(tf.convert_to_tensor(state, dtype=tf.float32))
-        action = self.get_action(action)
-        return action
+    def predict(self, state_list):
+        action = self.actor(tf.convert_to_tensor([state_list], dtype=tf.float32))
+        real_action = self.get_action(action)
+        return real_action
 
     def plot_result(self):
         plt.plot(self.save_episode_reward)
@@ -290,10 +293,10 @@ class DDPG_agent:
 from data_env import data_env
 symbol = '005930'
 max_episodes_step = 250
-max_episodes = 500
+max_episodes = 100
 input_days = 5
 balance = 100000000
-env = data_env('./data/day', symbol, max_episodes_step=max_episodes_step, balance=balance)
+env = data_env('./data/day', symbol, max_episodes_step=max_episodes_step, time_counts=input_days, balance=balance)
 agent = DDPG_agent(symbol, env, time_counts=input_days, balance=balance)
 agent.train(max_episode=max_episodes)
 agent.plot_result()

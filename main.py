@@ -68,7 +68,7 @@ balance = int(account['output2'][0]['tot_evlu_amt'])
 
 max_episode = 250
 input_days = 1
-env = data_env('./data/day', SYMBOL, max_episodes=max_episode, balance=balance, render_mode=False)
+env = data_env('./data/day', SYMBOL, max_episodes=max_episode, balance=balance)
 
 model = agent.DDPG_agent(SYMBOL, env, time_counts=input_days, balance=balance)
 model.load_model()
