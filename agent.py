@@ -258,8 +258,6 @@ class DDPG_agent:
 
             if episode % 10 == 0:
                 self.save_model()
-
-            if episode % 100 == 0:
                 self.env.render(f'{self.symbol}_{self.TIME_COUNTS}D_DDPG_{episode}')
 
     def validation(self):
