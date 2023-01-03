@@ -291,7 +291,7 @@ class DDPG_agent:
 from data_env import data_env
 symbol = '005930'
 max_episodes_step = 250
-max_episodes = 100
+max_episodes = 200
 input_days = 5
 balance = 100000000
 env = data_env('./data/day', symbol, max_episodes_step=max_episodes_step, time_counts=input_days, balance=balance)
