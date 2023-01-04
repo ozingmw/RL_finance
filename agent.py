@@ -273,10 +273,9 @@ class DDPG_agent:
             action = self.actor(tf.convert_to_tensor([state_list], dtype=tf.float32))
             real_action = self.get_action(action)
             state, reward, done, info = self.env.step(real_action, 1)
-            state = state.values.tolist()[0][1:]
             episode_reward += reward
             print(f'Reward: {episode_reward:.3f}, Action: {self.action_kor[real_action[0]]}')
-        self.env.render()
+        self.env.render(f'{self.symbol}_{self.TIME_COUNTS}D_DDPG_Val')
 
     def predict(self, state_list):
         action = self.actor(tf.convert_to_tensor([state_list], dtype=tf.float32))
@@ -289,7 +288,7 @@ class DDPG_agent:
 
 
 from data_env import data_env
-symbol = '005930'
+symbol = '052400'
 max_episodes_step = 250
 max_episodes = 200
 input_days = 5
