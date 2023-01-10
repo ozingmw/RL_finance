@@ -6,6 +6,8 @@
     data_collecter로 데이터 받는거 변경 및 스케일 조정
     data_env로 최대한 dataframe으로 변환 및 데이터 그대로 함
     agent에서 받은 데이터를 가공해서 함
+
+    action도 매수 매도만 설정
 '''
 
 import sys
