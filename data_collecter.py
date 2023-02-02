@@ -127,18 +127,3 @@ def update_all_csv():
         naver_day_crawler(symbol[0])
 
 
-def get_kospi_day(count):
-    url = 'https://finance.naver.com/sise/sise_index_day.naver?code=KOSPI&page=1'
-    headers = {'User-agent': 'Mozilla/5.0'}
-    res = requests.get(url=url, headers=headers)
-    text = bs(res.text, 'html.parser')
-
-    tr_list = text.find_all('tr')
-
-    for tr in tr_list:
-        if not tr.text:
-            continue
-        txt = re.sub(r'\n|\t', '', tr.text)
-        print(txt)
-
-get_kospi_day(10)

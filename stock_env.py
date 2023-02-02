@@ -178,6 +178,26 @@ def current_price(symbol):
         print("Error Code : " + str(res.status_code) + " | " + res.text)
         return None
 
+# def get_data(symbol, dwmy, start, end):
+#     PATH = "/uapi/domestic-stock/v1/quotations/inquire-daily-itemchartprice"
+#     URL = f'{URL_BASE}/{PATH}'
+#     headers = {"Content-Type":"application/json", 
+#             "authorization": f"Bearer {ACCESS_TOKEN}",
+#             "appKey":APP_KEY,
+#             "appSecret":APP_SECRET,
+#             "tr_id":"FHKST03010100"}
+#     params = {
+#         "fid_cond_mrkt_div_code":"J",
+#         "fid_input_iscd": symbol,
+#         "fid_input_date_1": start,
+#         "fid_input_date_2": end,
+#         "fid_period_div_code": dwmy,
+#         "fid_org_adj_prc": 0
+#     }
+#     res = requests.get(URL, headers=headers, params=params)
+#     a = res.json()['output1']
+#     b = res.json()['output2']
+
 def buy(symbol, price, counts):
     PATH = "/uapi/domestic-stock/v1/trading/order-cash"
     URL = f'{URL_BASE}/{PATH}'
